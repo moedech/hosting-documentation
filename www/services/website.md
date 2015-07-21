@@ -41,6 +41,7 @@ You have to define one of the following types for each website.
 
 ** Hint: ** If you need a type not mentioned here yet, do not hesitate to contact us.
 
+** Note: ** If you configure a database here, do not forget to add the settings for the database server. See [Database configuration](database.md#Prerequisites)
 
 #### typo3cms 
 
@@ -131,6 +132,9 @@ website::sites:
     "server_name": "php.example.net"
     "env":         "PROD"
     "type":        "php"
+# uncomment the following lines if you need an automatically created database
+#    "dbtype":      "mysql"
+#    "password":    "Aiw7vaakos04h7e"
 ```
 
 
@@ -194,6 +198,21 @@ website::sites:
 
 Hint: to control the uwsgi daemon, use the `uwsgi-reload` and `uwsgi-restart` shortcuts
 
+#### Symfony
+
+* nginx 1.6 with naxsi WAF, core rule set and Symfony white/blacklists
+* PHP-FPM 5.6 
+* MariaDB 10.x with database, user, and grants
+
+```
+website::sites: 
+  "symfonyexample":
+    "password":    "Efo9ohh4EiN3Iifeing7eijeeP4iesae"
+    "server_name": "symfony.example.net www.symfony.example.net"
+    "env":         "PROD"
+    "type":        "symfony"
+```
+Hint: For security reason, PHP execution is just allow for app.php, app_dev.php, config.php. All other requests end up in a 403 forbidden error.
 
 ## Environments
 
@@ -206,6 +225,7 @@ You have to select one of those environments for each website:
 * no access protection
 * phpinfo disabled (otherwise database credentials in environment variables could get leaked)
 * quiet error log level
+* E-Mails get sent to their designated recipient (PHP mail() only, see [E-Mail Handling](/development/email.md) for details)
 
 
 #### STAGE 
@@ -214,6 +234,7 @@ You have to select one of those environments for each website:
 * password protected (User "preview", password from "htpasswd" option)
 * phpinfo enabled
 * debug error log level
+* E-Mails get saved as file into the ~/tmp/ directory (PHP mail() only, see [E-Mail Handling](/development/email.md) for details)
 
 
 #### DEV
@@ -222,6 +243,7 @@ You have to select one of those environments for each website:
 * password protected (User "preview", password from "htpasswd" option)
 * phpinfo enabled
 * debug error log level
+* E-Mails get saved as file into the ~/tmp/ directory (PHP mail() only, see [E-Mail Handling](/development/email.md) for details)
 
 
 #### User Handling
@@ -256,6 +278,14 @@ website::users:
 You can add such uers for yourself and your co-workers. If you work on multiple websites, you do not have to look up the corresponding password all the time but just use the global one.
 
 ** Note: ** Please keep in mind that this password gets often transfered over unencrypted connections. As always, we recommend to use a particular password for only this purpose.
+
+#### Disable exeptions
+
+Never show detailed application based exeptions on PROD, to avoid [information leakage](https://www.owasp.org/index.php/Information_Leakage). Disable the output directly in your application. For example in TYPO3:
+
+```
+$TYPO3_CONF_VARS['SYS']['displayErrors'] = '0'; 
+```
 
 
 ### Environment Variables
@@ -594,6 +624,24 @@ if ($http_host = www.example.net) {
 }
 ```
 
+or you can password protect a subdirectory:
+
+```
+location ~* "^/example/" {
+	auth_basic "Example name";
+	auth_basic_user_file /home/user/www/example/.htpasswd;
+	root /home/user/www/;
+}
+```
+if you like to run PHP in this subdirectory, don't forget to add this nested in the location section from the example on top:
+
+```
+location ~ \.php {
+	try_files /dummy/$uri @php;
+}
+
+```
+
 Hint: For Details, see the [Server Block Examples](http://wiki.nginx.org/ServerBlockExample) and [Rewrite Rule](http://wiki.nginx.org/HttpRewriteModule#rewrite) documentation
 
 
@@ -687,144 +735,14 @@ To use TYPO3 Neos 1.2 with composer, use the following command:
 mkdir ~/Web/tmp/ && cd ~/Web/tmp/ && composer create-project --no-dev typo3/neos-base-distribution TYPO3-Neos-1.2 && rsync -a --delete-after ~/Web/tmp/TYPO3-Neos-1.2/ ~/
 ```
 
+#### Symfony with Composer
 
-## Deploy applications
-
-There are two options to switch a application between different environments:
-
-* switch environment on a existing website
-* create a new website with the desired environment setting, copy files (and database)
-
-
-### Switch environment
-
-With this option, you just change the environment for a particular website, for example from STAGE to PROD. If the former environment is still required, you have to add a new website and copy all data back, we recommend to use the second method by default.
-
-* rename "env" value from "STAGE" to "PROD"
-* remove "htpasswd" value which is not required anymore
-
-
-### New website, copy data
-
-With this option, you just add another website with the desired environment and copy all files (and database) into the new website.
-
-
-#### Copy files
-
-Login into the old website and issue this command:
+To use Symfony 2 with composer, use the following command:
 
 ```
-rsync -avz --exclude=typo3temp ~/ newuser@server:~/
+# Create Web/tmp directory, install Symfony2 with composer, move to users home directory and cleanup
+mkdir ~/web/tmp/ && cd ~/web/tmp/ && composer create-project symfony/framework-standard-edition symfony && rsync -a --delete-after ~/web/tmp/symfony/ ~/
 ```
-
-Hint: use appropriate exclude patterns to ignore all not required files
-
-Hint: depending on the nature of your version control, you can skip all or most of this manual copy, but just checkout your project into the new website
-
-Note: we use always SSH to copy files, even on the same server. This ensures that all files and directories belong to the appropriate user
-
-
-#### Copy database
-
-Login into the old website and issue this command:
-
-```
-mysqldump --single-transaction --ignore-table=exampledatabase.cache_pages --ignore-table=exampledatabase.cache_hash -uexampledatabaseuser -ppassword exampledatabase | ssh newuser@server mysql -unewdatabase -ppassword newdatabase
-```
-
-Hint: Skip big and not required tables with the "--ignore-table" parameter
-
-
-##### Identify big tables
-
-```
-SELECT table_name AS "tables", 
-round(((data_length + index_length) / 1024 / 1024), 2) "Size in MB" 
-FROM information_schema.TABLES 
-WHERE table_schema = "<dbname>"
-ORDER BY (data_length + index_length) DESC;
-```
-
-Warning: You have to create those ignored tables manually on the new website afterwards
-
-
-## Go Live
-
-### Testing
-
-First of all, make sure everything is in place as desired. Always simulate productive calls to the application by adding all involved host names to your local hosts file. If you expect heavy usage, carry out load tests beforehand.
-
-Hint: We are happy to assist you with architecture, sizing and load tests
-
-
-### DNS Records
-
-Note: set a low TTL value in DNS beforehand. We recommend to use "300" always
-
-
-#### Lookup addresses
-
-Connect to your server and note both IPv4 and IPv6 address:
-
-```
-$ facter ipaddress ipaddress6
-ipaddress => 192.168.0.99
-ipaddress6 => 2001:db8::99
-```
-
-#### Add records
-
-Add DNS records within the DNS server of your choice.
-
-```
-example.net.     A       192.168.0.99
-example.net.     AAAA    2001:db8::99
-www.example.net. A       192.168.0.99
-www.example.net. AAAA    2001:db8::99
-```
-
-Note: always add both A/AAAA DNS Records. Even if you have no IPv6 connectivity yet, others will, and IPv6 usage will spread
-
-Hint: for more information about our dualstack infrastructure, see the  [Dualstack](/server/dualstack.md) Site.
-
-
-#### Check records
-
-Right after you changed the records, you should query your dns server and compare the returned values against those from your lookup before:
-
-```
-dig A www.example.net @nameserver
-dig AAAA www.example.net @nameserver
-```
-
-#### Check HTTP
-
-At last, check HTTP access for both IPv4 and IPv6 protocol to make sure everything went fine:
-
-```
-wget -4 www.example.net
-wget -6 www.example.net
-```
-
-
-### Reverse Proxy
-
-If you want to make sure, that the old server/website wont deliver any requests anymore at all, add a reverse proxy on the old server which redirects all traffic to the new server. With this setup, you can switch servers without the uncertainties of the global DNS System.
-
-If your old site is using Apache, add this virtual host:
-
-```
-<VirtualHost 192.168.0.22:80>
-  ServerName        example.net
-  ServerAlias       www.example.net
-  ErrorLog          /path/to/error.log
-  CustomLog         /path/to/access.log combined
-  ProxyRequests     Off
-  ProxyPreserveHost On
-  ProxyPass         / http://new.host.name/
-</VirtualHost>
-```
-
 
 ## Delete website
 
@@ -891,6 +809,11 @@ website::sites:
     "type":        "uwsgi"
     "dbtype":      "postgresql"
     "password":    "ohQueeghoh0bath"
+  "symfonyexample":
+    "server_name": "symfony.example.net www.symfony.example.net"
+    "password":    "Efo9ohh4EiN3Iifeing7eijeeP4iesae"
+    "env":         "PROD"
+    "type":        "symfony"
   "magentoexample":
     "server_name": "magento.example.net"
     "env":         "PROD"

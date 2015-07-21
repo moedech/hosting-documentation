@@ -25,6 +25,21 @@ Right now we support Vagrant on Ubuntu Linux (LXC Provider) and Mac OS (VirtualB
 * [VT-x enabled CPU](http://en.wikipedia.org/wiki/X86_virtualization#Intel-VT-x)
 * working [VirtualBox](https://www.virtualbox.org/) (Mac OS) or [LXC](https://linuxcontainers.org/) (Ubuntu) installation
 * [Vagrant](http://www.vagrantup.com/downloads.html)
+* NFS server daemon (pre-installed on Mac OS X, "nfs-kernel-server" package on Ubuntu)
+* (Ubuntu only) AppArmor configuration for LXC mounts in `/etc/apparmor.d/lxc/lxc-default`
+```
+profile lxc-container-default flags=(attach_disconnected,mediate_deleted) {
+...
+  mount options=(rw, bind),
+...
+}
+```
+* (Ubuntu only) additional LXC configuration `/etc/lxc/default.conf`
+```
+lxc.network.type = veth
+lxc.network.link = lxcbr0
+lxc.network.flags = up
+```
 * Vagrant Plugins
 ```
 vagrant plugin install vagrant-hostmanager   # required to access VM trough name/aliases
@@ -57,11 +72,11 @@ Warning: Do not override the other settings within `vagrantconf` unless you know
 ## Vagrant commands
 
 ```
-vagrant up                 # start VM
-vagrant provision          # update Debian packages and Puppet modules
-vagrant ssh                # connect trough SSH
-vagrant halt               # stop VM
-vagrant destroy            # delete VM
+vagrant up         # start VM
+vagrant provision  # update Debian packages and Puppet modules
+vagrant ssh        # connect trough SSH
+vagrant halt       # stop VM
+vagrant destroy    # delete VM
 ```
 
 
@@ -69,4 +84,5 @@ vagrant destroy            # delete VM
 
  * load your SSH key into ssh-agent (VM has to access different repositorys with your key)
  * use Vagrant commands like `vagrant up` to control your VM only
- * there is no centralized database management tool available. Read the [corresponding article](https://snowflakehosting.ch/#!services/database.md#Access) to know how to connect anyhow.
+ * there is no centralized database management tool available. Read the [corresponding article](https://snowflakehosting.ch/#!services/database.md#Access) to know how to connect anyhow
+
