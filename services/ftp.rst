@@ -20,7 +20,7 @@ Users
 ::
 
     ftp::users:
-      "alice":
+      "username":
         "password": "$6$1sLLOf5.$GAZDHYXEjs0MpR5uHBAR5eD00MpUasTgbyIP27PZ8WprL98XeU01N502ogYn1JKrgqEiTXn1/lkFBNZ46zZHY/"
         "uid":      "1005"
         "gid":      "1005"
@@ -48,7 +48,7 @@ Directories
         "limit":
           "WRITE":
             "DenyAll":
-            "AllowUser": "alice"
+            "AllowUser": "username"
 
 will led to this ProFTPD configuration:
 
@@ -57,6 +57,6 @@ will led to this ProFTPD configuration:
     <Directory /home/examplenet/tmp/>
         <Limit WRITE>
             DenyAll undef
-            AllowUser alice
+            AllowUser username
         </Limit>
     </Directory>
